@@ -5,7 +5,7 @@
 library(googlesheets4)
 library(tidyverse)
 library(vegan)
-require(Rarefy)
+#require(Rarefy)
 library(sf)
 library(piggyback)
 library(units)
@@ -53,6 +53,9 @@ gs4_auth(token = drive_token())
 foreach(i=1:nrow(sheet_urls)) %do% {
 drive_download(sheet_urls[i,2], path = paste0("data/",sheet_urls[i,1], ".xlsx"), overwrite = TRUE)
 }
+
+# Get accepted species names list
+accspp <- read_xlsx(paste0("data/",sheet_urls[i,1], ".xlsx"),"AcceptedSpecies")
 
 # Loop through sheets and assemble data
 alldata <- foreach(i=1:nrow(sheet_urls)) %do% {
@@ -103,6 +106,7 @@ data <- data_downloaded %>%
 list(sites=sitesheet,quaddata=data)
 
 }
+
 
 
 # Use map to extract and combine specific elements from the inner lists
