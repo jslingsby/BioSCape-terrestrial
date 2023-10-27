@@ -25,12 +25,13 @@ if (Sys.getenv("USER") == "adam") {gmail = "adamw@buffalo.edu"}
 ######### Plot kml
 # download plot location data kml
 
-tag="v20230828_botanists" #specify the most recent version of the plot kml
+tag="v20230905" #specify the most recent version of the plot kml
 
-repo="BioSCape-io/BioSCape-terrestrial"
+repo="BioSCape-io/BioSCape-terrestrial" #"BioSCape-io/BioSCape-terrestrial"
 gpkgfile=paste0("bioscape_vegplots_",tag,".gpkg")
 
-pb_download(file = gpkgfile,repo = repo,dest=file.path("spatialdata"))
+#pb_download(file = gpkgfile,repo = repo,dest=file.path("spatialdata"))
+pb_download(file = gpkgfile,repo = repo, dest=file.path("spatialdata"))
 points=st_read(file.path("spatialdata",gpkgfile)) %>% 
   mutate(plotnum=as.numeric(gsub("T","",plot)))
 
@@ -53,9 +54,6 @@ gs4_auth(token = drive_token())
 foreach(i=1:nrow(sheet_urls)) %do% {
 drive_download(sheet_urls[i,2], path = paste0("data/",sheet_urls[i,1], ".xlsx"), overwrite = TRUE)
 }
-
-# Get accepted species names list
-accspp <- read_xlsx(paste0("data/",sheet_urls[i,1], ".xlsx"),"AcceptedSpecies")
 
 # Loop through sheets and assemble data
 alldata <- foreach(i=1:nrow(sheet_urls)) %do% {
@@ -89,6 +87,7 @@ read_xlsx(sheet,tab) %>%
     select(-SeasonallyApparent,  #drop field causing problems with weird entry in Rondevlei_147
           # -NewSpecies,
            -MeanCanopyDiameter_cm) %>% 
+    mutate(SiteCode_Plot_Quadrant = as.character(SiteCode_Plot_Quadrant)) %>%
     filter(!is.na(SiteCode_Plot_Quadrant)) %>%
     mutate(NameCheck = as.character(NameCheck)) %>%
     mutate(NewSpecies = as.character(NewSpecies))
@@ -125,6 +124,24 @@ quads=map(alldata, function(x) x["quaddata"][[1]]) %>%
   filter(!is.na(Plot))
 
 
+# names check - pull out incorrect genus or species or combo for botanists to check...
+accnames=read_xlsx(sheet,"AcceptedSpecies")
+quads <- quads %>% mutate(Taxon = paste(AcceptedGenus, AcceptedSpecies, sep = " "))
+
+match_gen <- sprintf("\\b(%s)\\b", paste(accnames$Genus, collapse = "|"))
+match_spp <- sprintf("\\b(%s)\\b", paste(accnames$Species, collapse = "|"))
+match_nms <- sprintf("\\b(%s)\\b", paste(accnames$Taxon, collapse = "|"))
+
+hmm <- quads %>% 
+  mutate(GenFlag = ifelse(str_detect(AcceptedGenus, match_gen), "Yes", "No")) %>%
+  mutate(SppFlag = ifelse(str_detect(AcceptedSpecies, match_spp), "Yes", "No")) %>%
+  mutate(TaxFlag = ifelse(str_detect(Taxon, match_nms), "Yes", "No")) %>%
+  filter(GenFlag != "Yes" | SppFlag != "Yes" | TaxFlag != "Yes") %>%
+  left_join(sites[,c("SiteCode_Plot", "Observer")], relationship = "many-to-many") %>%
+  filter(!Taxon %in% c("Phylica ericoides", "Phylica imberbis", "Phylica lanata", "Phylica plumosa", "Phylica lasiocarpa")) %>%
+  unique() %>%
+  write_sheet(ss = "https://docs.google.com/spreadsheets/d/1xfCWp8bhqz_HRFBjAlUFV6I_kFpGpUB4UleeOQz5bhw/edit#gid=0", sheet = as.character(Sys.Date()))
+
 
 if(F){  # some EDA
 quads %>%
@@ -136,8 +153,6 @@ quads %>%
   length(unique(quads$Plot))
   length(unique(quads$Genus_Species_combo))
 
-  
-  
   }
 
 
