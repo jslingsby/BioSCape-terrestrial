@@ -42,6 +42,7 @@ points=st_read(file.path("spatialdata",gpkgfile)) %>%
 sheet_urls <- data.frame(rbind(
   c(sheet="Ross01",url="https://docs.google.com/spreadsheets/d/19RdI9SdqOx8zn6XBxywgUNgmAHJ6JatOjtTEK-VAcQE/edit#gid=266439266"), 
   c("Ross01b","https://docs.google.com/spreadsheets/d/12IYf_NobQfFlHBQTTZ3ZmuWdzklg-xlkJ5_-TZRcDug/edit#gid=266439266"), 
+  c("Ross01c","https://docs.google.com/spreadsheets/d/1BrY4c1AWGjPYdtpLTFXLNjFk1z1elMtGlCsg0ylD44g/edit#gid=266439266"), 
   c("Bio02","https://docs.google.com/spreadsheets/d/1OEE2u7NmZ37a4y8iogjh8r0R22L-eVxV04ns8yqy91A/edit#gid=266439266"),
   c("Bio03","https://docs.google.com/spreadsheets/d/11S2nd_3RnbKTMDEo6fj67mnwBPnSIgiOpZBVTx287Tc/edit#gid=266439266"), 
   c("Bio04","https://docs.google.com/spreadsheets/d/113GkBpKVlcGeA8aoWyaN0lWiW4vbtgDokzD0xcjRquQ/edit#gid=266439266")))
@@ -78,7 +79,8 @@ sitesheet=read_xlsx(sheet,"SiteData") %>%
 # Filter using grep to identify only plot and drop template sheets
 plot_sheets <- sheets[grepl("plot", sheets,ignore.case = T) & !grepl("Template_Plot|Template_plot|Example_plot", sheets) & 
                         !grepl("Swartberg_20_plot",sheets) & #swartberg 20 is empty
-                        !grepl("Gardenroute_T275_plot",sheets)
+                        !grepl("Gardenroute_T275_plot",sheets) &
+                        !grepl("test",sheets)
                       ] 
 
 # Download data from the specified tabs as data frames
@@ -334,16 +336,16 @@ pb_upload(file = f_plot_species,
 #########  Update plot locations with current status
 # download plot polygons that were manually uploaded to github releases
 
-plot_filename=paste0("bioscape_plotpolygons_",tag,".gpkg")
-pb_download(file = plot_filename,
-          repo="BioSCape-io/BioSCape-terrestrial",
-          tag=tag,dest = "data")
-
-homogeneous_areas=st_read(file.path("data",plot_filename),layer = "homogeneous_areas" )
-
-allplots=st_read(file.path("data",gpkgfile)) %>%
-  mutate(sampled_site=old_plot%in%sites$Plot, #identify which have site data
-         sampled_cover=old_plot%in%data$Plot,
-         sampled_homogeneous=old_plot%in%homogeneous_areas$plot) #identify which have cover data
-
+# plot_filename=paste0("bioscape_plotpolygons_",tag,".gpkg")
+# pb_download(file = plot_filename,
+#           repo="BioSCape-io/BioSCape-terrestrial",
+#           tag=tag,dest = "data")
+# 
+# homogeneous_areas=st_read(file.path("data",plot_filename),layer = "homogeneous_areas" )
+# 
+# allplots=st_read(file.path("data",gpkgfile)) %>%
+#   mutate(sampled_site=old_plot%in%sites$Plot, #identify which have site data
+#          sampled_cover=old_plot%in%data$Plot,
+#          sampled_homogeneous=old_plot%in%homogeneous_areas$plot) #identify which have cover data
+# 
 
