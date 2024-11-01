@@ -37,11 +37,14 @@ tag="v20230905" #specify the most recent version of the plot kml
 repo="BioSCape-io/BioSCape-terrestrial" #"BioSCape-io/BioSCape-terrestrial"
 gpkgfile=paste0("bioscape_vegplots_",tag,".gpkg")
 
-#pb_download(file = gpkgfile,repo = repo,dest=file.path("spatialdata"))
-pb_download(file = gpkgfile,repo = repo, dest=file.path("spatialdata"))
-points=st_read(file.path("spatialdata",gpkgfile)) %>% 
+#pb_download(file = gpkgfile,repo = repo, dest=file.path("spatialdata"))
+points=st_read(file.path("spatialdata",gpkgfile)) %>%
   mutate(plotnum=as.numeric(gsub("T","",plot)))
 
+# tag = "v20240912"
+# 
+# points = st_read("spatialdata/BioSCapeSpatialProducts2024_09_12/BioSCapeVegCenters2024_09_12.shp") %>% 
+#   mutate(plotnum=as.numeric(gsub("T","",BScpPID)))
 
 ################################
 ### Download data sheets
@@ -78,25 +81,28 @@ alldata <- foreach(i=1:nrow(sheet_urls)) %do% {
     
 # For each excel workbook file as downloaded above
 sheet <- paste0("data/", Sys.Date(), sheet_urls[i,1], ".xlsx")
-
     
 # List names of all sheet tabs
 sheets = excel_sheets(sheet)
 
+  #Check
   #if(F) find_dups=read_sheet(sheet,"SiteData") %>% distinct(SiteCode_Plot) %>% arrange() %>% View()
 
-### Read in site data (one sheet/tab for each workbook)
+# Read in site data (one sheet/tab for each workbook)
 sitesheet=read_xlsx(sheet,"SiteData") %>% 
   mutate(sheet_name=sheet,
-         Plot=as.numeric(sub("T","",Plot)))
+         Plot=as.numeric(sub("T","",Plot))) %>%
+  filter(! Plot %in% c(275, 194, 139, 51, 53))
 
 
-### Read in quadrat data (multiple sheets/tabs for each workbook)
+# Read in quadrat data (multiple sheets/tabs for each workbook)
 # Filter sheet names using grep to identify only plot and drop template sheets
 plot_sheets <- sheets[grepl("plot", sheets,ignore.case = T) & !grepl("Template_Plot|Template_plot|Example_plot", sheets) & 
                       #  !grepl("Swartberg_20_plot",sheets) & #swartberg 20 is empty - deleted from GoogleSheets
                         !grepl("Gardenroute_T275_plot",sheets) & #Adam Labuschagne's "dodgy" plots
                         !grepl("Gardenroute_T139_plot",sheets) & #Adam Labuschagne's "dodgy" plots
+                        !grepl("Gardenroute_T051_plot",sheets) & #Adam Labuschagne's "dodgy" plots
+                        !grepl("Gardenroute_T053_plot",sheets) & #Adam Labuschagne's "dodgy" plots
                         !grepl("Hawequas_194 Plot",sheets) & #Adam Labuschagne's "dodgy" plots
                         !grepl("test",sheets)
                       ] 
@@ -146,7 +152,7 @@ sites <- map(alldata, function(x) x["sites"][[1]] %>%
 
 quads <- map(alldata, function(x) x["quaddata"][[1]]) %>%  
 #               select(-PostFireAge_years)) %>%   # drop problem column due to varying inputs         #NEED FIX
-  bind_rows()%>%
+  bind_rows() %>%
   filter(!is.na(Plot)) %>%
   mutate(SeasonallyApparent = as.numeric(case_match(SeasonallyApparent, c("1","yes","Y","Yes") ~ 1,
                                          c("no", "No", "N") ~ 0)),
@@ -178,7 +184,9 @@ hmm <- quads %>%
   "Phylica plumosa", 
   "Phylica lasiocarpa", 
   "Phylica rigidifolia")) %>%
-  unique() %>% View() #There will be a bunch...
+  unique() #
+
+hmm %>% View() #There will be a bunch...
   #write_sheet(ss = "https://docs.google.com/spreadsheets/d/1xfCWp8bhqz_HRFBjAlUFV6I_kFpGpUB4UleeOQz5bhw/edit#gid=0", sheet = as.character(Sys.Date()))
 
 
@@ -278,13 +286,57 @@ if(F){ # EDA
   filter(points,plot==checkq)
   filter(quads2,old_plot==9)#Plot==checkq)
   
-  table(sites2$Plot%in%quads2$Plot) # Are all site names in the quadrat data? No - 3 plots have site data but species data are dodgy (Adam Labuschagne)
-  table(quads2$Plot%in%sites2$Plot) # Are all quadrat names in the site data? Should be Yes
+  table(sites2$Plot%in%quads2$Plot) # Are all site names in the quadrat data? Should be TRUE
+  table(quads2$Plot%in%sites2$Plot) # Are all quadrat names in the site data? Should be TRUE
   
   sum(duplicated(sites2$SiteCode_Plot_Quadrant)) # Find plots that were sampled by multiple botanists...
-  sites2[which(duplicated(sites2$SiteCode_Plot_Quadrant)),]
+  sites2[which(duplicated(sites2$SiteCode_Plot_Quadrant)),] %>% View()
 }
 # quads2 %>% mutate(plotnum=as.numeric(sub("T","",Plot))) %>% filter(plotnum!=old_plot) %>% select(SiteCode_Plot_Quadrant,Plot,plotnum, old_plot)
+
+################################
+### Other data checks
+################################
+
+## Does the sum of the dominant species covers (from quads) correlate with the total estimated veg cover (from sites)? Label plots by Plot number.
+
+quads2 %>% group_by(Plot, Quadrant) %>% summarise(cover=sum(PercentCoverAlive)) %>% 
+  left_join(sites2 %>% select(Plot,Quadrant,PercentLiveVegetation)) %>% 
+  group_by(Plot) %>% summarise(cover=mean(cover), veg=mean(PercentLiveVegetation)) %>%
+  ggplot(aes(x=cover,y=veg, label = Plot)) + 
+  geom_point() + 
+  geom_abline() + 
+  geom_text()
+
+## Does the square of the mean diameter multiplied by the abundance correlate with the cover? Label plots by Plot number.
+
+quads2 %>% mutate(area = AbundanceAlive_count*pi*(MeanCanopyDiameter_cm/2)^2) %>%
+  ggplot(aes(x=PercentCoverAlive,y=area, label = Taxon)) + 
+  geom_point() + 
+  geom_abline() + 
+  geom_text()
+  
+quads2 %>% mutate(area = AbundanceAlive_count*pi*(MeanCanopyDiameter_cm/2)^2) %>%
+  group_by(Plot, Quadrant) %>% summarise(area=sum(area)) %>% 
+  left_join(sites2 %>% select(Plot,Quadrant,PercentLiveVegetation)) %>% 
+  group_by(Plot) %>% summarise(veg=mean(PercentLiveVegetation), area=sum(area)) %>%
+  filter(!Plot == "T149") %>%
+  ggplot(aes(x=veg,y=area, label = Plot)) + 
+  geom_point() + 
+  geom_abline() + 
+  geom_text()
+  
+  
+  
+# quads2 %>% group_by(Plot, Taxon) %>% 
+#   summarise(diam=mean(MeanCanopyDiameter_cm),abund=sum(AbundanceAlive_count)) %>% 
+#   mutate(area = abund*pi()*(diam/2)^2) %>%
+#   left_join(sites2 %>% select(Plot,Quadrant,PercentLiveVegetation)) %>% 
+#   group_by(Plot) %>% summarise(diam=mean(diam),abund=mean(abund), veg=mean(PercentLiveVegetation)) %>%
+#   ggplot(aes(x=diam*abund,y=veg, label = Plot)) + 
+#   geom_point() + 
+#   geom_abline() + 
+#   geom_text()
 
 
 ################################
@@ -311,6 +363,7 @@ sites2 %>%
             PercentBareRock=mean(PercentBareRock,na.rm=T),
             PercentDeadVegetation=mean(PercentDeadVegetation,na.rm=T),
             PercentLiveVegetation=mean(PercentLiveVegetation,na.rm=T),
+            VegHeightMean_cm=mean(VegHeight_cm,na.rm=T),
             SoilDepth_cm=mean(SoilDepth_cm),
             Groundwater=first(Groundwater),
             Access_Notes=first(Access_Notes),
@@ -337,7 +390,9 @@ quads2 %>%
             PercentCoverDead=sum(PercentCoverDead)/4,
             AbundanceAlive_count=sum(AbundanceAlive_count),
             AbundanceDead_count=sum(AbundanceDead_count),
-            Clonal=first(Clonal_YesNo)
+            MeanCanopyDiameter_cm=mean(MeanCanopyDiameter_cm, na.rm = T),
+            Clonal=first(Clonal_YesNo),
+            SeasonallyApparent=max(SeasonallyApparent, na.rom = T)
             ) %>%
   arrange(Plot,desc(PercentCoverAlive)) %>% 
   write_csv(f_plot_species)
