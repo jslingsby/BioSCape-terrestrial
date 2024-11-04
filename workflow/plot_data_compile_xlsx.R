@@ -311,17 +311,17 @@ quads2 %>% group_by(Plot, Quadrant) %>% summarise(cover=sum(PercentCoverAlive)) 
 ## Does the square of the mean diameter multiplied by the abundance correlate with the cover? Label plots by Plot number.
 
 quads2 %>% mutate(area = AbundanceAlive_count*pi*(MeanCanopyDiameter_cm/2)^2) %>%
-  ggplot(aes(x=PercentCoverAlive,y=area, label = Taxon)) + 
+  ggplot(aes(x=PercentCoverAlive,y=area, label = Plot)) + 
   geom_point() + 
   geom_abline() + 
   geom_text()
   
-quads2 %>% mutate(area = AbundanceAlive_count*pi*(MeanCanopyDiameter_cm/2)^2) %>%
-  group_by(Plot, Quadrant) %>% summarise(area=sum(area)) %>% 
+quads2 %>% mutate(perc_area = (AbundanceAlive_count*pi*(MeanCanopyDiameter_cm/2)^2)/7854) %>%
+  group_by(Plot, Quadrant) %>% summarise(perc_area=sum(perc_area)) %>% 
   left_join(sites2 %>% select(Plot,Quadrant,PercentLiveVegetation)) %>% 
-  group_by(Plot) %>% summarise(veg=mean(PercentLiveVegetation), area=sum(area)) %>%
+  group_by(Plot) %>% summarise(veg=mean(PercentLiveVegetation), perc_area=sum(perc_area)) %>%
   filter(!Plot == "T149") %>%
-  ggplot(aes(x=veg,y=area, label = Plot)) + 
+  ggplot(aes(x=veg,y=perc_area, label = Plot)) + 
   geom_point() + 
   geom_abline() + 
   geom_text()
