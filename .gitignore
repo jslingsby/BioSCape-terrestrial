@@ -5,6 +5,8 @@ _site/*
 .Rhistory
 index_files
 data/*
+spatialdata/*
+output/*
 index_cache
 .DS_Store
 .Rhistory
