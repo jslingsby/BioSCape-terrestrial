@@ -9,5 +9,4 @@ spatialdata/*
 output/*
 index_cache
 .DS_Store
-.Rhistory
 webdata
